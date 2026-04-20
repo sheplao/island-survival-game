@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>原始人海島求生 - Civilization Evolution</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=ZCOOL+Pixel&display=swap');
+        
+        body {
+            margin: 0; overflow: hidden; background-color: #0d0d0d;
+            font-family: 'ZCOOL Pixel', sans-serif; touch-action: none; user-select: none;
+        }
+
+        canvas { display: block; image-rendering: pixelated; cursor: crosshair; }
+
+        /* 主選單 */
+        #start-menu {
+            position: fixed; inset: 0; z-index: 2000;
+            background: linear-gradient(to bottom, rgba(13, 13, 13, 0.8), rgba(26, 26, 26, 0.95));
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .menu-frame {
+            text-align: center; padding: 50px; border-radius: 24px;
+            border: 4px solid #facc15; background: rgba(0, 0, 0, 0.6);
+            box-shadow: 0 0 50px rgba(250, 204, 21, 0.2);
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+        .game-title {
+            font-size: 64px; font-weight: 900; color: #facc15;
+            text-shadow: 0 0 20px rgba(250, 204, 21, 0.5);
+            margin-bottom: 10px; letter-spacing: 4px;
+        }
+
+        .game-subtitle {
+            font-size: 24px; color: #94a3b8; margin-bottom: 40px; letter-spacing: 2px;
+        }
+
+        .btn-start {
+            background: #facc15; color: #000; font-size: 28px; font-weight: 900;
+            padding: 15px 60px; border-radius: 50px; border: none; cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 0 #854d0e;
+        }
+
+        .btn-start:hover { transform: translateY(-5px) scale(1.05); background: #fde047; box-shadow: 0 15px 0 #854d0e; }
+        .btn-start:active { transform: translateY(2px); box-shadow: 0 5px 0 #854d0e; }
+
+        /* 遊戲介面 */
+        #game-ui {
+            position: absolute; top: 25px; left: 25px; pointer-events: none;
+            color: white; text-shadow: 2px 2px 4px rgba(0,0,0,0.8); z-index: 100;
+            display: none;
+        }
+
+        .status-card {
+            background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px);
+            padding: 16px; border-radius: 12px; border: 2px solid rgba(251, 191, 36, 0.4);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+        }
+
+        .bar-wrapper { margin-bottom: 12px; position: relative; }
+        .bar-label { font-size: 12px; color: #fef08a; margin-bottom: 4px; display: flex; justify-content: space-between; font-weight: bold; }
+        
+        .bar-bg { 
+            width: 220px; height: 20px; background: #0f172a; border-radius: 4px; 
+            border: 2px solid #334155; overflow: hidden; position: relative;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .bar-fill { 
+            height: 100%; width: 100%; transition: width 0.2s ease-out;
+            position: relative;
+        }
+
+        .bar-fill::after {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(to bottom, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 100%);
+        }
+
+        .hp-fill { background: #ef4444; }
+        .food-fill { background: #f59e0b; }
+        .water-fill { background: #0ea5e9; }
+        .sta-fill { background: #22c55e; }
+        .sta-low { background: #dc2626 !important; animation: pulse 0.5s infinite; }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.7; } }
+
+        .bar-text {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 11px; font-weight: 900; white-space: nowrap;
+            color: #fff; text-shadow: 1px 1px 2px #000, -1px -1px 2px #000;
+            z-index: 2;
+        }
+
+        #quest-overlay {
+            position: absolute; top: 25px; left: 300px;
+            background: rgba(15, 23, 42, 0.7); border-left: 4px solid #3b82f6;
+            padding: 12px 20px; color: #fff; border-radius: 8px; backdrop-filter: blur(4px);
+            display: none;
+        }
+
+        #notifications {
+            position: absolute; top: 320px; left: 25px;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+
+        .notif {
+            background: rgba(0,0,0,0.8); border-left: 4px solid #facc15;
+            padding: 10px 20px; color: #fff; font-size: 14px; border-radius: 4px;
+            animation: slideIn 0.4s ease-out forwards;
+        }
+
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-30px); } to { opacity: 1; transform: translateX(0); } }
+
+        .ui-modal {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+            display: none; align-items: center; justify-content: center; z-index: 1000;
+        }
+
+        .window-frame {
+            background: #1e293b; border: 4px solid #facc15;
+            width: 540px; padding: 30px; border-radius: 15px; color: white;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        .grid-inv { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-top: 20px; }
+        .slot-inv {
+            background: #0f172a; border: 2px solid #334155; aspect-ratio: 1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            position: relative; cursor: pointer; transition: 0.2s; border-radius: 8px;
+        }
+        .slot-inv:hover { border-color: #facc15; transform: scale(1.05); }
+        .item-count { position: absolute; bottom: 4px; right: 6px; color: #facc15; font-size: 12px; font-weight: bold; }
+
+        .craft-panel {
+            position: absolute; right: 25px; top: 25px; width: 280px;
+            background: rgba(15, 23, 42, 0.9); border: 2px solid #facc15; border-radius: 16px;
+            padding: 20px; color: white; backdrop-filter: blur(10px); display: none;
+        }
+
+        .btn-craft {
+            width: 100%; background: #334155; padding: 12px; margin-top: 10px;
+            border: 1px solid #475569; border-radius: 8px; text-align: left; transition: 0.2s; color: white;
+        }
+        .btn-craft:hover:not(:disabled) { background: #475569; border-color: #facc15; transform: translateY(-2px); }
+        .btn-craft:disabled { opacity: 0.3; cursor: not-allowed; }
+        .req-tag { font-size: 10px; color: #94a3b8; display: block; }
+
+        .controls-guide {
+            position: absolute; bottom: 20px; left: 20px;
+            background: rgba(0,0,0,0.8); border: 2px solid #555;
+            padding: 12px; border-radius: 8px; color: #ddd; font-size: 12px;
+        }
+        .key-hint { background: #444; color: #fbbf24; padding: 1px 5px; border-radius: 4px; margin-right: 3px; font-weight: bold; }
+        .shake-ui { animation: ui-shake 0.2s ease-in-out; }
+        @keyframes ui-shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+    </style>
+</head>
+<body>
+
+<!-- 主選單 -->
+<div id="start-menu">
+    <div class="menu-frame">
+        <h1 class="game-title">原始人海島求生</h1>
+        <p class="game-subtitle">CIVILIZATION EVOLUTION</p>
+        <div class="mb-10 text-slate-400 text-sm text-left inline-block max-w-md">
+            <div class="mb-2">🏔️ 探索廣闊的程序生成島嶼</div>
+            <div class="mb-2">🪵 收集資源，打造生存必備工具</div>
+            <div class="mb-2">🍖 狩獵野生動物，建立堅固基地</div>
+            <div class="mb-2">⛵ 建造遠洋大木船，逃離這座島嶼</div>
+        </div>
+        <br>
+        <button class="btn-start" id="btn-start-game">開始生存</button>
+    </div>
+</div>
+
+<!-- 遊戲 UI -->
+<div id="game-ui">
+    <div class="status-card" id="status-card">
+        <div class="mb-4 text-xl font-black tracking-widest text-yellow-400 border-b border-yellow-500/30 pb-2" id="clock-txt">DAY 1 - 早晨</div>
+        
+        <div class="bar-wrapper">
+            <div class="bar-label">生命值 (HP)</div>
+            <div class="bar-bg">
+                <div id="hp-bar" class="bar-fill hp-fill"></div>
+                <div id="hp-val" class="bar-text">100 / 100</div>
+            </div>
+        </div>
+        
+        <div class="bar-wrapper">
+            <div class="bar-label">飽食度 (Food)</div>
+            <div class="bar-bg">
+                <div id="food-bar" class="bar-fill food-fill"></div>
+                <div id="food-val" class="bar-text">100 / 100</div>
+            </div>
+        </div>
+        
+        <div class="bar-wrapper">
+            <div class="bar-label">飲水度 (Water)</div>
+            <div class="bar-bg">
+                <div id="water-bar" class="bar-fill water-fill"></div>
+                <div id="water-val" class="bar-text">100 / 100</div>
+            </div>
+        </div>
+        
+        <div class="bar-wrapper">
+            <div class="bar-label">耐力值 (Stamina)</div>
+            <div id="sta-container" class="bar-bg">
+                <div id="sta-bar" class="bar-fill sta-fill"></div>
+                <div id="sta-val" class="bar-text">100 / 100</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="quest-overlay">
+    <div class="text-xs uppercase text-blue-400 font-black mb-1">▶ 生存目標</div>
+    <div id="quest-txt" class="text-sm font-bold">🌲 收集木材 (5) 與石材 (3) 製作石斧</div>
+</div>
+
+<div id="notifications"></div>
+
+<div class="craft-panel" id="craft-panel">
+    <div class="text-md font-black border-b border-slate-700 pb-2 mb-2">🔨 隨身合成</div>
+    <button class="btn-craft" onclick="craft('axe')">🪓 石斧 <span class="req-tag">木材 5, 石材 3</span></button>
+    <button class="btn-craft" onclick="craft('pickaxe')">⛏️ 石鎬 <span class="req-tag">木材 3, 石材 5</span></button>
+    <button class="btn-craft" onclick="craft('workbench')">🏗️ 工作檯 <span class="req-tag">木材 10, 石材 5</span></button>
+    <button class="btn-craft" onclick="craft('campfire')">🔥 篝火 <span class="req-tag">木材 8, 石材 5</span></button>
+</div>
+
+<div class="controls-guide" id="controls-ui" style="display:none">
+    <div class="text-yellow-500 font-bold mb-1">🎮 操作提示</div>
+    <div><span class="key-hint">WASD</span> 移動 | <span class="key-hint">Shift</span> 奔跑</div>
+    <div><span class="key-hint">B</span> 背包 | <span class="key-hint">E</span> 互動 / 烹飪</div>
+    <div><span class="key-hint">點擊</span> 採集 / 狩獵</div>
+</div>
+
+<!-- 彈出視窗 -->
+<div id="modal-inv" class="ui-modal">
+    <div class="window-frame">
+        <h2 class="text-3xl font-black border-b border-slate-700 pb-4 text-yellow-400 mb-6">背囊 (Inventory)</h2>
+        <div class="grid-inv" id="inv-grid"></div>
+        <button onclick="toggleInv(false)" class="mt-8 w-full bg-yellow-500 text-black py-4 rounded-xl font-black shadow-lg">返回冒險</button>
+    </div>
+</div>
+
+<div id="modal-bench" class="ui-modal">
+    <div class="window-frame">
+        <h2 class="text-3xl font-black border-b border-slate-700 pb-4 text-blue-400 mb-6">工作檯 (Craft Table)</h2>
+        <div class="grid grid-cols-2 gap-5">
+            <button class="btn-craft h-24" onclick="craft('sword')"><span class="text-lg">⚔️ 精製石劍</span> <span class="req-tag">木材 2, 石材 10 | 傷害 +500%</span></button>
+            <button class="btn-craft h-24" onclick="craft('armor')"><span class="text-lg">🧥 獸皮衣</span> <span class="req-tag">皮毛 15 | 傷害減免 40%</span></button>
+            <button class="btn-craft h-24" onclick="craft('wall')"><span class="text-lg">🧱 堅固石牆</span> <span class="req-tag">石材 10 | 建立防線</span></button>
+            <button class="btn-craft h-24 border-2 border-yellow-500" onclick="craft('ship')"><span class="text-lg text-yellow-400">⛵ 遠洋木船</span> <span class="req-tag">木材 180, 石材 80, 皮毛 40</span></button>
+        </div>
+        <button onclick="toggleBench(false)" class="mt-8 w-full bg-slate-700 py-3 rounded-lg">離開</button>
+    </div>
+</div>
+
+<div id="modal-victory" class="ui-modal">
+    <div class="window-frame text-center">
+        <h1 class="text-5xl font-black text-yellow-400 mb-4 animate-bounce">🌅 成功生還 🌅</h1>
+        <p class="text-xl mb-6 text-slate-300">你最終克服了島嶼上的殘酷自然環境，成功駛向文明。</p>
+        <div id="victory-log" class="bg-black/50 p-6 rounded-xl mb-8 text-yellow-400 text-3xl font-black"></div>
+        <button onclick="location.reload()" class="bg-yellow-500 text-black px-12 py-4 rounded-full font-black text-xl hover:bg-yellow-400 shadow-xl transition-all">新的開始</button>
+    </div>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<script>
+/**
+ * 原始人海島求生：極致進化版
+ */
+
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const TILE_SIZE = 64;
+const WORLD_SIZE = 60;
+const DAY_TICKS = 108000; // 30 分鐘一個循環
+
+// --- 音效引擎 ---
+const Sound = {
+    ctx: null,
+    init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+    play(type) {
+        this.init(); if(this.ctx.state === 'suspended') this.ctx.resume();
+        const now = this.ctx.currentTime;
+        const g = this.ctx.createGain(); g.connect(this.ctx.destination);
+        const o = this.ctx.createOscillator();
+        switch(type) {
+            case 'step': o.type='sine'; o.frequency.setValueAtTime(50, now); g.gain.setValueAtTime(0.02, now); break;
+            case 'chop': o.type='square'; o.frequency.setValueAtTime(120, now); g.gain.setValueAtTime(0.1, now); break;
+            case 'mine': o.type='triangle'; o.frequency.setValueAtTime(1400, now); g.gain.setValueAtTime(0.08, now); break;
+            case 'hit': o.type='sawtooth'; o.frequency.setValueAtTime(200, now); g.gain.setValueAtTime(0.12, now); break;
+            case 'craft': o.type='sine'; o.frequency.setValueAtTime(800, now); g.gain.setValueAtTime(0.2, now); break;
+            case 'fail': o.type='square'; o.frequency.setValueAtTime(100, now); g.gain.setValueAtTime(0.1, now); break;
+        }
+        o.connect(g); g.gain.exponentialRampToValueAtTime(0.01, now+0.1);
+        o.start(); o.stop(now+0.1);
+    }
+};
+
+const state = {
+    started: false,
+    p: {
+        x: WORLD_SIZE*TILE_SIZE/2, y: WORLD_SIZE*TILE_SIZE/2,
+        hp: 100, food: 100, water: 100, sta: 100,
+        dir: 1, anim: 0, moving: false, running: false, attack: 0,
+        inv: { wood: 0, stone: 0, berry: 0, meat: 0, cooked: 0, hide: 0, seed: 0, axe: false, pickaxe: false, sword: false, armor: false }
+    },
+    cam: { x: 0, y: 0, shake: 0 },
+    tiles: [], resources: [], animals: [], structures: [], crops: [], floatingTexts: [],
+    days: 1, ticks: 0, time: 0, keys: {}, mining: null,
+    ui: { inv: false, bench: false, win: false }
+};
+
+const Draw = {
+    pixel(x, y, w, h, color) {
+        ctx.fillStyle = color; ctx.fillRect(Math.floor(x), Math.floor(y), Math.ceil(w), Math.ceil(h));
+    },
+    player(x, y, p) {
+        const bounce = Math.sin(p.anim * 0.15) * (p.moving ? 6 : 2);
+        const leg = p.moving ? Math.sin(p.anim * 0.2) * 8 : 0;
+        ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.ellipse(x, y+2, 12, 5, 0, 0, Math.PI*2); ctx.fill();
+        this.pixel(x-7, y-8+leg, 5, 8, '#c2a47c');
+        this.pixel(x+2, y-8-leg, 5, 8, '#c2a47c');
+        const bodyColor = p.inv.armor ? '#334155' : '#78350f';
+        this.pixel(x-10, y-26-bounce, 20, 18, bodyColor);
+        this.pixel(x-10, y-26-bounce, 20, 4, '#451a03');
+        let swing = p.attack > 0 ? Math.sin((10-p.attack)/10*Math.PI)*60 : 0;
+        ctx.save(); ctx.translate(p.dir > 0 ? x+10 : x-10, y-18-bounce); ctx.rotate((p.dir > 0 ? swing : -swing) * Math.PI/180);
+        this.pixel(-2, -2, 5, 12, '#d2b48c');
+        if(p.inv.sword) { this.pixel(-3, 8, 8, 22, '#e2e8f0'); this.pixel(-5, 8, 12, 4, '#451a03'); }
+        else if(p.inv.axe && p.attack > 0) { this.pixel(-2, 10, 4, 12, '#451a03'); this.pixel(-7, 20, 14, 7, '#64748b'); }
+        ctx.restore();
+        this.pixel(x-9, y-44-bounce, 18, 18, '#d2b48c');
+        this.pixel(x-11, y-48-bounce, 22, 10, '#262626');
+        this.pixel(p.dir > 0 ? x+3 : x-7, y-36-bounce, 4, 4, '#000');
+    },
+    tree(x, y) {
+        ctx.fillStyle = 'rgba(0,0,0,0.2)'; ctx.beginPath(); ctx.ellipse(x, y+4, 25, 10, 0, 0, Math.PI*2); ctx.fill();
+        this.pixel(x-8, y-25, 16, 35, '#451a03');
+        const layers = [{w: 80, h: 40, off: 35, c: '#064e3b'}, {w: 60, h: 35, off: 55, c: '#065f46'}, {w: 40, h: 30, off: 75, c: '#059669'}];
+        layers.forEach(l => {
+            ctx.fillStyle = l.c; ctx.beginPath(); ctx.moveTo(x, y-l.off-l.h); ctx.lineTo(x-l.w/2, y-l.off); ctx.lineTo(x+l.w/2, y-l.off); ctx.fill();
+            ctx.fillStyle = 'rgba(255,255,255,0.1)'; ctx.beginPath(); ctx.moveTo(x, y-l.off-l.h); ctx.lineTo(x, y-l.off); ctx.lineTo(x+l.w/2, y-l.off); ctx.fill();
+        });
+    },
+    rock(x, y) {
+        this.pixel(x-25, y-15, 50, 25, '#475569'); this.pixel(x-20, y-22, 35, 12, '#94a3b8');
+        this.pixel(x+5, y-10, 10, 5, '#1e293b');
+    },
+    animal(ani, x, y) {
+        const bounce = Math.abs(Math.sin(ani.anim * 0.15)) * 5;
+        ctx.fillStyle = 'rgba(0,0,0,0.1)'; ctx.beginPath(); ctx.ellipse(x, y+2, 15, 5, 0, 0, Math.PI*2); ctx.fill();
+        if(ani.type === 'cow') {
+            this.pixel(x-24, y-28-bounce, 48, 30, '#78350f'); this.pixel(x-10, y-20-bounce, 12, 12, '#fff');
+            this.pixel(ani.vx>0?x+18:x-34, y-24-bounce, 16, 16, '#451a03');
+        } else if(ani.type === 'pig') {
+            this.pixel(x-18, y-18-bounce, 36, 22, '#f472b6'); this.pixel(ani.vx>0?x+12:x-26, y-22-bounce, 14, 14, '#fbcfe8');
+        } else {
+            this.pixel(x-22, y-24-bounce, 44, 26, '#f8fafc'); this.pixel(ani.vx>0?x+15:x-25, y-18-bounce, 12, 12, '#1e293b');
+        }
+    },
+    crab(x, y, anim) {
+        const m = Math.sin(anim * 0.4) * 5;
+        this.pixel(x-15, y-10, 30, 16, '#ef4444');
+        for(let i=0; i<3; i++) { this.pixel(x-22, y-5+i*5+m, 8, 3, '#dc2626'); this.pixel(x+14, y-5+i*5-m, 8, 3, '#dc2626'); }
+    },
+    workbench(x, y) {
+        this.pixel(x-16, y-10, 32, 20, '#5d4037'); this.pixel(x-18, y-14, 36, 4, '#795548');
+        this.pixel(x-14, y, 4, 12, '#3e2723'); this.pixel(x+10, y, 4, 12, '#3e2723');
+    },
+    ship(x, y) {
+        this.pixel(x-80, y-15, 160, 40, '#451a03'); this.pixel(x-90, y-25, 180, 15, '#78350f');
+        this.pixel(x-4, y-100, 8, 90, '#2d1102'); this.pixel(x+4, y-90, 60, 60, '#f1f5f9');
+    }
+};
+
+function init() {
+    for (let y = 0; y < WORLD_SIZE; y++) {
+        state.tiles[y] = [];
+        for (let x = 0; x < WORLD_SIZE; x++) {
+            const dx = x - WORLD_SIZE/2, dy = y - WORLD_SIZE/2;
+            const d = Math.sqrt(dx*dx + dy*dy);
+            let type = 'grass';
+            if (d > WORLD_SIZE/2 - 2) type = 'water'; else if (d > WORLD_SIZE/2 - 7) type = 'sand';
+            state.tiles[y][x] = { type, noise: Math.random() };
+            if (type === 'grass' && Math.random() < 0.08) state.resources.push({ x: x*TILE_SIZE+32, y: y*TILE_SIZE+32, type: Math.random()>0.35?'tree':'berry', hp: 100 });
+            else if (type === 'sand' && Math.random() < 0.04) state.resources.push({ x: x*TILE_SIZE+32, y: y*TILE_SIZE+32, type: 'rock', hp: 100 });
+        }
+    }
+    spawnAnimals();
+}
+
+function spawnAnimals() {
+    const types = ['pig', 'sheep', 'cow'];
+    while (state.animals.length < 25) {
+        const rx = Math.random()*WORLD_SIZE*TILE_SIZE, ry = Math.random()*WORLD_SIZE*TILE_SIZE;
+        const tx = Math.floor(rx/TILE_SIZE), ty = Math.floor(ry/TILE_SIZE);
+        if(!state.tiles[ty] || state.tiles[ty][tx].type === 'water') continue;
+        let type = state.tiles[ty][tx].type === 'sand' ? 'crab' : types[Math.floor(Math.random()*types.length)];
+        state.animals.push({ x: rx, y: ry, type, hp: 100, vx: Math.random()-0.5, vy: Math.random()-0.5, anim: Math.random()*100, timer: 150 });
+    }
+}
+
+function notify(txt) {
+    const box = document.getElementById('notifications');
+    const el = document.createElement('div'); el.className = 'notif'; el.innerText = txt;
+    box.appendChild(el); setTimeout(() => el.remove(), 3000);
+}
+
+function addFloatingText(x, y, txt, color='#fff') {
+    state.floatingTexts.push({ x, y, txt, color, life: 1.0 });
+}
+
+function craft(type) {
+    if(!state.started) return;
+    const r = { axe: { wood: 5, stone: 3 }, pickaxe: { wood: 3, stone: 5 }, workbench: { wood: 10, stone: 5 }, campfire: { wood: 8, stone: 5 }, sword: { wood: 2, stone: 10, table: true }, armor: { hide: 15, table: true }, wall: { stone: 8, table: true }, ship: { wood: 180, stone: 80, hide: 40, table: true } };
+    const recipe = r[type];
+    for(let m in recipe) {
+        if(m === 'table') { if(!state.ui.bench) { notify("⚠️ 靠近工作檯進行製作"); return; } continue; }
+        if(state.p.inv[m] < recipe[m]) { notify(`❌ 缺少資源: ${m}`); return; }
+    }
+    for(let m in recipe) if(m !== 'table') state.p.inv[m] -= recipe[m];
+    Sound.play('craft');
+    if(type === 'workbench') state.structures.push({ x: state.p.x, y: state.p.y, type: 'workbench' });
+    else if(type === 'campfire') state.structures.push({ x: state.p.x, y: state.p.y, type: 'campfire' });
+    else if(type === 'ship') state.structures.push({ x: state.p.x, y: state.p.y, type: 'ship' });
+    else if(type === 'axe') state.p.inv.axe = true;
+    else if(type === 'pickaxe') state.p.inv.pickaxe = true;
+    else if(type === 'sword') state.p.inv.sword = true;
+    else if(type === 'armor') state.p.inv.armor = true;
+    notify(`✅ 成功製作 ${type.toUpperCase()}!`);
+    updateQuest();
+}
+
+function updateQuest() {
+    let q = "";
+    if(!state.p.inv.axe) q = "🌲 採集木材 (5) 與石材 (3) 製作石斧";
+    else if(!state.structures.find(s=>s.type==='workbench')) q = "🏗️ 製作工作檯並將其放置";
+    else if(!state.p.inv.sword) q = "⚔️ 在工作檯製作石劍獵殺大象或野豬";
+    else q = "⛵ 收集資源建造大木船逃離荒島";
+    document.getElementById('quest-txt').innerText = q;
+}
+
+function toggleInv(show) { state.ui.inv = show; document.getElementById('modal-inv').style.display = show?'flex':'none'; if(show) renderInv(); }
+function toggleBench(show) { state.ui.bench = show; document.getElementById('modal-bench').style.display = show?'flex':'none'; }
+
+function renderInv() {
+    const g = document.getElementById('inv-grid'); g.innerHTML = '';
+    const items = [{id:'wood', n:'木材', i:'🪵'}, {id:'stone', n:'石材', i:'🪨'}, {id:'berry', n:'漿果', i:'🍒'}, {id:'meat', n:'生肉', i:'🥩'}, {id:'cooked', n:'熟肉', i:'🍗'}, {id:'hide', n:'皮毛', i:'🧥'}, {id:'seed', n:'種子', i:'🌱'}];
+    items.forEach(it => {
+        const count = state.p.inv[it.id];
+        const cell = document.createElement('div'); cell.className = 'slot-inv';
+        cell.innerHTML = `<span class="text-4xl">${it.i}</span><span class="text-[10px] mt-2 font-bold">${it.n}</span><span class="item-count">${count}</span>`;
+        cell.onclick = () => {
+            if(count <= 0) return;
+            if(it.id === 'berry') { state.p.food = Math.min(100, state.p.food+12); state.p.inv[it.id]--; }
+            else if(it.id === 'cooked') { state.p.hp = Math.min(100, state.p.hp+35); state.p.food = Math.min(100, state.p.food+45); state.p.inv[it.id]--; }
+            else if(it.id === 'seed') { 
+                const tx=Math.floor(state.p.x/TILE_SIZE), ty=Math.floor(state.p.y/TILE_SIZE);
+                if(state.tiles[ty]?.[tx]?.type==='grass') { state.crops.push({x:state.p.x, y:state.p.y, age:0}); state.p.inv.seed--; notify("種下了種子..."); }
+            }
+            renderInv();
+        };
+        g.appendChild(cell);
+    });
+}
+
+function update() {
+    if(!state.started || state.p.hp <= 0 || state.victory) return;
+    const p = state.p;
+    if(state.ui.inv || state.ui.bench) return;
+
+    state.ticks++;
+    state.time = (state.ticks % DAY_TICKS) / DAY_TICKS;
+    const labels = ["午夜", "黎明", "正午", "下午", "黃昏", "夜晚"];
+    document.getElementById('clock-txt').innerText = `DAY ${state.days} - ${labels[Math.floor(state.time * 6)]}`;
+    if(state.ticks % DAY_TICKS === 0) state.days++;
+
+    if(state.cam.shake > 0) state.cam.shake *= 0.9;
+
+    let mx=0, my=0;
+    if(state.keys['w']) my--; if(state.keys['s']) my++;
+    if(state.keys['a']) { mx--; p.dir=-1; } if(state.keys['d']) { mx++; p.dir=1; }
+    p.moving = (mx!==0 || my!==0);
+    p.running = state.keys['shift'] && p.moving && p.sta > 1;
+
+    if(p.running) { p.sta = Math.max(0, p.sta-0.45); if(p.sta <= 0) p.running=false; }
+    else { p.sta = Math.min(100, p.sta+0.18); }
+    
+    if(p.sta < 20) {
+        document.getElementById('sta-bar').classList.add('sta-low');
+        if(state.keys['shift'] && p.moving && p.sta <= 1) { document.getElementById('sta-container').classList.add('shake-ui'); setTimeout(()=>document.getElementById('sta-container').classList.remove('shake-ui'), 200); }
+    } else { document.getElementById('sta-bar').classList.remove('sta-low'); }
+
+    if(p.moving) {
+        const s = p.running ? 2.6 : 1.35;
+        const nx = p.x + mx*s, ny = p.y + my*s;
+        if(state.tiles[Math.floor(ny/TILE_SIZE)]?.[Math.floor(nx/TILE_SIZE)]?.type !== 'water') {
+            p.x = nx; p.y = ny;
+            if(state.ticks % 25 === 0) Sound.play('step');
+        }
+        p.anim++;
+    }
+
+    state.animals.forEach(ani => {
+        ani.timer--; if(ani.timer <= 0) { ani.vx = Math.random()-0.5; ani.vy = Math.random()-0.5; ani.timer=200; }
+        const spd = ani.type === 'crab' ? 0.3 : 0.6;
+        let nx = ani.x + ani.vx*spd, ny = ani.y + ani.vy*spd;
+        if(state.tiles[Math.floor(ny/TILE_SIZE)]?.[Math.floor(nx/TILE_SIZE)]?.type !== 'water') { ani.x = nx; ani.y = ny; ani.anim++; }
+        else { ani.vx*=-1; ani.vy*=-1; }
+    });
+
+    state.crops.forEach(c => c.age++);
+
+    if(state.mining) {
+        const dist = Math.sqrt((state.mining.x-p.x)**2 + (state.mining.y-p.y)**2);
+        if(dist > 110) state.mining = null;
+        else {
+            let pwr = 0.8;
+            if(state.mining.type==='tree' && p.inv.axe) pwr = 8;
+            if(state.mining.type==='rock' && p.inv.pickaxe) pwr = 8;
+            if(state.ticks % 15 === 0) Sound.play(state.mining.type==='tree'?'chop':'mine');
+            state.mining.hp -= pwr;
+            if(state.mining.hp <= 0) {
+                const r = state.mining;
+                if(r.type==='tree') { p.inv.wood+=5; addFloatingText(r.x, r.y, "+5 木材", "#fbbf24"); }
+                else if(r.type==='rock') { p.inv.stone+=4; addFloatingText(r.x, r.y, "+4 石材", "#94a3b8"); }
+                else if(r.type==='berry') { p.inv.berry+=2; if(Math.random()<0.3) p.inv.seed++; addFloatingText(r.x, r.y, "+2 漿果", "#ef4444"); }
+                state.resources = state.resources.filter(x => x !== r); state.mining = null;
+            }
+        }
+    }
+
+    if(state.ticks % 180 === 0) {
+        p.food = Math.max(0, p.food-0.12); p.water = Math.max(0, p.water-0.15);
+        if(p.food<=0 || p.water<=0) { p.hp -= 1.5; state.cam.shake = 4; }
+    }
+
+    if(p.attack > 0) p.attack--;
+
+    // 更新 UI 文字
+    document.getElementById('hp-bar').style.width = p.hp + '%';
+    document.getElementById('hp-val').innerText = `${Math.ceil(p.hp)} / 100`;
+    document.getElementById('food-bar').style.width = p.food + '%';
+    document.getElementById('food-val').innerText = `${Math.ceil(p.food)} / 100`;
+    document.getElementById('water-bar').style.width = p.water + '%';
+    document.getElementById('water-val').innerText = `${Math.ceil(p.water)} / 100`;
+    document.getElementById('sta-bar').style.width = p.sta + '%';
+    document.getElementById('sta-val').innerText = `${Math.ceil(p.sta)} / 100`;
+}
+
+function render() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const camX = state.p.x - canvas.width/2 + (Math.random()-0.5)*state.cam.shake;
+    const camY = state.p.y - canvas.height/2 + (Math.random()-0.5)*state.cam.shake;
+
+    for (let y = 0; y < WORLD_SIZE; y++) {
+        for (let x = 0; x < WORLD_SIZE; x++) {
+            const tx = x*TILE_SIZE-camX, ty = y*TILE_SIZE-camY;
+            if(tx<-TILE_SIZE || tx>canvas.width || ty<-TILE_SIZE || ty>canvas.height) continue;
+            const tile = state.tiles[y][x];
+            ctx.fillStyle = tile.type==='water' ? '#1e3a8a' : (tile.type==='sand'?'#fde047':'#15803d');
+            ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
+        }
+    }
+
+    state.crops.forEach(c => {
+        const size = Math.min(20, c.age/200);
+        Draw.pixel(c.x-camX-size/2, c.y-camY-size, size, size, '#4ade80');
+        if(c.age > 4000) Draw.pixel(c.x-camX-2, c.y-camY-size-4, 4, 4, '#ef4444');
+    });
+
+    state.structures.forEach(s => {
+        const sx = s.x-camX, sy = s.y-camY;
+        if(s.type==='campfire') {
+            Draw.pixel(sx-15, sy-5, 30, 10, '#451a03');
+            const h = 15 + Math.sin(state.ticks*0.2)*10;
+            ctx.fillStyle = '#f97316'; ctx.beginPath(); ctx.moveTo(sx, sy-10-h); ctx.lineTo(sx-12, sy-5); ctx.lineTo(sx+12, sy-5); ctx.fill();
+        } else if(s.type==='workbench') Draw.workbench(sx, sy);
+        else if(s.type==='ship') Draw.ship(sx, sy);
+        else if(s.type==='wall') Draw.pixel(sx-20, sy-20, 40, 40, '#475569');
+    });
+
+    state.resources.forEach(r => {
+        const rx = r.x-camX, ry = r.y-camY;
+        if(r.type==='tree') Draw.tree(rx, ry);
+        else if(r.type==='rock') Draw.rock(rx, ry);
+        else if(r.type==='berry') { ctx.font="24px Arial"; ctx.fillText('🍒', rx-12, ry); }
+        if(state.mining === r) { ctx.fillStyle='#000'; ctx.fillRect(rx-20, ry-90, 40, 6); ctx.fillStyle='#fbbf24'; ctx.fillRect(rx-20, ry-90, 40*(1-r.hp/100), 6); }
+    });
+
+    state.animals.forEach(a => {
+        const ax=a.x-camX, ay=a.y-camY;
+        if(a.type==='crab') Draw.crab(ax, ay, a.anim); else Draw.animal(a, ax, ay);
+        ctx.fillStyle='rgba(0,0,0,0.5)'; ctx.fillRect(ax-15, ay-35, 30, 4);
+        ctx.fillStyle='#ff4d4d'; ctx.fillRect(ax-15, ay-35, 30*(a.hp/100), 4);
+    });
+
+    if(state.started) Draw.player(canvas.width/2, canvas.height/2, state.p);
+
+    state.floatingTexts.forEach(f => { ctx.globalAlpha = f.life; ctx.fillStyle = f.color; ctx.font="bold 16px Arial"; ctx.fillText(f.txt, f.x-camX, f.y-camY); });
+    ctx.globalAlpha = 1.0;
+
+    const night = Math.max(0, (Math.cos(state.time * Math.PI * 2 + Math.PI) + 1) / 2 * 0.85);
+    if(night > 0.1 && state.started) {
+        const grad = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 60, canvas.width/2, canvas.height/2, 500);
+        grad.addColorStop(0, `rgba(5, 5, 40, 0)`); grad.addColorStop(1, `rgba(5, 5, 40, ${night})`);
+        ctx.fillStyle = grad; ctx.fillRect(0,0,canvas.width,canvas.height);
+        state.structures.forEach(s => {
+            if(s.type==='campfire') {
+                const cg = ctx.createRadialGradient(s.x-camX, s.y-camY, 10, s.x-camX, s.y-camY, 180);
+                cg.addColorStop(0, 'rgba(249, 115, 22, 0.5)'); cg.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = cg; ctx.beginPath(); ctx.arc(s.x-camX, s.y-camY, 180, 0, Math.PI*2); ctx.fill();
+            }
+        });
+    }
+}
+
+window.addEventListener('keydown', e => {
+    if(!state.started) return;
+    const k = e.key.toLowerCase(); state.keys[k] = true;
+    if(k === 'b') toggleInv(!state.ui.inv);
+    if(k === 'e') {
+        let found = false;
+        state.structures.forEach(s => {
+            if(Math.sqrt((s.x-state.p.x)**2+(s.y-state.p.y)**2) < 100) {
+                if(s.type==='campfire' && state.p.inv.meat > 0) { state.p.inv.meat--; state.p.inv.cooked++; notify("🍖 肉烤熟了！"); Sound.play('craft'); found=true; }
+                else if(s.type==='workbench') { toggleBench(true); found=true; }
+                else if(s.type==='ship') { state.victory=true; document.getElementById('modal-victory').style.display='flex'; document.getElementById('victory-log').innerText=`生存天數：${state.days} 天`; found=true; }
+            }
+        });
+        state.crops.forEach((c,i) => {
+            if(Math.sqrt((c.x-state.p.x)**2+(c.y-state.p.y)**2) < 60 && c.age > 4000) { state.p.inv.berry+=4; state.crops.splice(i,1); notify("收穫了漿果！"); found=true; }
+        });
+    }
+});
+window.addEventListener('keyup', e => state.keys[e.key.toLowerCase()] = false);
+
+canvas.addEventListener('mousedown', e => {
+    if(!state.started || state.ui.inv || state.ui.bench || state.victory) return;
+    const wx = e.clientX+state.p.x-canvas.width/2, wy = e.clientY+state.p.y-canvas.height/2;
+    state.p.attack = 10; Sound.play('hit');
+    for(let i=state.animals.length-1; i>=0; i--) {
+        const a = state.animals[i];
+        if(Math.sqrt((a.x-wx)**2+(a.y-wy)**2)<55 && Math.sqrt((a.x-state.p.x)**2+(a.y-state.p.y)**2)<110) {
+            const dmg = state.p.inv.sword ? 70 : 25; a.hp -= dmg; state.cam.shake = 6;
+            addFloatingText(a.x, a.y, `-${dmg}`, "#f00");
+            if(a.hp <= 0) { state.p.inv.meat+=(a.type==='cow'?5:3); state.p.inv.hide+=1; notify("獲得生肉與皮毛"); state.animals.splice(i,1); }
+            return;
+        }
+    }
+    state.resources.forEach(r => { if(Math.sqrt((r.x-wx)**2+(r.y-wy)**2)<55 && Math.sqrt((r.x-state.p.x)**2+(r.y-state.p.y)**2)<110) state.mining = r; });
+    const tx=Math.floor(wx/TILE_SIZE), ty=Math.floor(wy/TILE_SIZE);
+    if(state.tiles[ty]?.[tx]?.type==='water' && Math.sqrt((wx-state.p.x)**2+(wy-state.p.y)**2)<110) { state.p.water=Math.min(100, state.p.water+20); notify("補充飲水"); }
+});
+
+document.getElementById('btn-start-game').addEventListener('click', () => {
+    Sound.init(); state.started = true;
+    document.getElementById('start-menu').style.display = 'none';
+    document.getElementById('game-ui').style.display = 'block';
+    document.getElementById('quest-overlay').style.display = 'block';
+    document.getElementById('craft-panel').style.display = 'block';
+    document.getElementById('controls-ui').style.display = 'block';
+    notify("生存挑戰開始！");
+    updateQuest();
+});
+
+window.addEventListener('resize', () => { canvas.width=window.innerWidth; canvas.height=window.innerHeight; });
+window.onload = () => { canvas.width=window.innerWidth; canvas.height=window.innerHeight; init();
+    function loop() { update(); render(); requestAnimationFrame(loop); } loop();
+};
+</script>
+</body>
+</html>
